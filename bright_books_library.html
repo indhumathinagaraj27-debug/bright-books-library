@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bright Books Library</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#fff9c4,#fce4ec);color:#26334a}
+header{background:linear-gradient(120deg,#2563eb,#0ea5e9);color:white;padding:25px 15px;text-align:center;border-radius:0 0 25px 25px}
+header h1{margin:0 0 8px}
+nav{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:18px 8px}
+button{background:#2563eb;color:white;border:0;border-radius:9px;padding:11px 15px;cursor:pointer;font-size:15px}
+nav button{background:white;color:#26334a}
+main{max-width:800px;margin:auto;padding:15px}
+input{width:100%;padding:12px;margin:7px 0 14px;border:1px solid #ccd3df;border-radius:8px;font-size:16px}
+.book{background:white;border-radius:12px;padding:16px;margin:12px 0;box-shadow:0 2px 8px #0001}
+.book h3{margin-top:0}.status{color:#526078}.hidden{display:none}
+.return{background:#16a34a}.delete{background:#dc2626}
+.panel{background:white;padding:20px;border-radius:16px;margin-bottom:15px}
+#message{color:#166534;font-weight:bold}
+</style>
+</head>
+<body>
+<header><h1>📚 Bright Books</h1><p>Your colorful little library, always in your pocket</p></header>
+<nav>
+<button onclick="showTab('all')">All Books</button>
+<button onclick="showTab('add')">Add Book</button>
+<button onclick="showTab('search')">Search</button>
+<button onclick="showTab('issued')">Issued</button>
+</nav>
+<main>
+<p id="message" role="status"></p>
+<section id="all"><h2>📖 All Books</h2><div id="bookList"></div></section>
+<section id="add" class="hidden"><div class="panel">
+<h2>➕ Add a Book</h2>
+<form id="bookForm">
+<label for="bookName">Book Name</label><input id="bookName" required placeholder="Enter book name">
+<label for="author">Author Name</label><input id="author" required placeholder="Enter author name">
+<label for="quantity">Number of Copies</label><input id="quantity" type="number" min="1" max="10000" required placeholder="Enter copies">
+<button type="submit">Save Book</button>
+</form></div></section>
+<section id="search" class="hidden"><h2>🔍 Search Books</h2><input id="searchBox" placeholder="Search book or author..." oninput="renderSearch()"><div id="searchList"></div></section>
+<section id="issued" class="hidden"><h2>📋 Issued Books</h2><div id="issuedList"></div></section>
+</main>
+<script>
+let books=[];
+try{books=JSON.parse(localStorage.getItem("brightBooks"))||[];if(!Array.isArray(books))books=[];}catch(e){books=[];}
+function save(){localStorage.setItem("brightBooks",JSON.stringify(books));render();}
+function showTab(tab){["all","add","search","issued"].forEach(id=>document.getElementById(id).classList.toggle("hidden",id!==tab));render();}
+function notify(text){document.getElementById("message").textContent=text;}
+document.getElementById("bookForm").addEventListener("submit",function(e){
+ e.preventDefault();
+ const name=document.getElementById("bookName").value.trim(),author=document.getElementById("author").value.trim(),quantity=Number(document.getElementById("quantity").value);
+ if(!name||!author||!Number.isInteger(quantity)||quantity<1){notify("Please enter valid book details.");return;}
+ const existing=books.find(b=>b.name.toLowerCase()===name.toLowerCase()&&b.author.toLowerCase()===author.toLowerCase());
+ if(existing)existing.total+=quantity;else books.push({id:Date.now(),name,author,total:quantity,issued:[]});
+ save();this.reset();showTab("all");notify("Book added successfully!");
+});
+function issueBook(id){
+ const book=books.find(b=>b.id===id);if(!book)return;
+ if(book.issued.length>=book.total){notify("No copies available!");return;}
+ const student=prompt("Enter student name:");if(!student||!student.trim())return;
+ book.issued.push({student:student.trim(),date:new Date().toLocaleDateString()});save();notify("Book issued successfully!");
+}
+function returnBook(id,index){const book=books.find(b=>b.id===id);if(!book||!book.issued[index])return;book.issued.splice(index,1);save();notify("Book returned successfully!");}
+function escapeHTML(value){return String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function bookCard(book){
+ const available=book.total-book.issued.length;
+ return `<div class="book"><h3>📘 ${escapeHTML(book.name)}</h3><p>Author: ${escapeHTML(book.author)}</p><p class="status">Total copies: ${book.total} | Available: ${available}</p><button onclick="issueBook(${book.id})" ${available===0?"disabled":""}>Issue Book</button> <button class="return" onclick="showTab('issued')">Return Book</button> <button class="delete" onclick="deleteBook(${book.id})">Delete</button></div>`;
+}
+function deleteBook(id){const b=books.find(x=>x.id===id);if(!b)return;if(b.issued.length){notify("Return all issued copies before deleting this book.");return;}if(confirm("Delete this book?")){books=books.filter(x=>x.id!==id);save();notify("Book deleted.");}}
+function render(){document.getElementById("bookList").innerHTML=books.length?books.map(bookCard).join(""):"<p>No books yet. Tap Add Book to begin!</p>";renderSearch();renderIssued();}
+function renderSearch(){const box=document.getElementById("searchBox"),q=box?box.value.trim().toLowerCase():"";const matches=books.filter(b=>b.name.toLowerCase().includes(q)||b.author.toLowerCase().includes(q));document.getElementById("searchList").innerHTML=matches.length?matches.map(bookCard).join(""):"<p>No matching books found.</p>";}
+function renderIssued(){let items=[];books.forEach(b=>b.issued.forEach((x,i)=>items.push(`<div class="book"><h3>📕 ${escapeHTML(b.name)}</h3><p>Student: ${escapeHTML(x.student)}</p><p>Issue date: ${escapeHTML(x.date)}</p><button class="return" onclick="returnBook(${b.id},${i})">Return Book</button></div>`)));document.getElementById("issuedList").innerHTML=items.length?items.join(""):"<p>No books currently issued.</p>";}
+render();
+</script>
+</body>
+</html>
